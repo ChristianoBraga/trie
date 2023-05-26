@@ -15,7 +15,9 @@ typedef struct _Trie {
     struct _Trie* children[UCHAR_MAX] ;
 } Trie ;
 
-Trie* trie_mk_trie(void) {
+Trie* _the_trie = NULL ;
+
+Trie* _trie_mk_trie(void) {
     Trie* t = (Trie*) malloc(sizeof(Trie)) ;
     assert(t) ;
     t->is_terminal = false ;
@@ -26,19 +28,19 @@ Trie* trie_mk_trie(void) {
     return t ;
 }
 
-void trie_insert(Trie* t, const char* key, int value) {
+void _trie_insert(Trie* t, const char* key, int value) {
     assert(t) ;
     Trie* aux = t ;
     for (int i = 0; i < strlen(key); i++) {
         if (aux->children[key[i]] == NULL) 
-            aux->children[key[i]] = trie_mk_trie() ;
+            aux->children[key[i]] = _trie_mk_trie() ;
         aux = aux->children[key[i]] ;
     }
     aux->is_terminal = true ;
     aux->value = value ;
 }
 
-bool trie_find(Trie* t, const char* key) {
+bool _trie_find(Trie* t, const char* key, int* value) {
     Trie* aux = t;
     for (int i = 0; i < strlen(key); i++) {
         if (aux->children[key[i]] == NULL) {
@@ -46,22 +48,23 @@ bool trie_find(Trie* t, const char* key) {
         }
         aux = aux->children[key[i]];
     }
+    *value = aux->value ;
     return (aux != NULL && aux->is_terminal);
 }
 
-void trie_free(Trie* t) {
+void _trie_free(Trie* t) {
     if (t == NULL) {
         return;
     }
     for (int i = 0; i < UCHAR_MAX; i++) {
         if (t->children[i] != NULL) {
-            trie_free(t->children[i]);
+            _trie_free(t->children[i]);
         }
     }
     free(t);
 }
 
-bool trie_is_empty(Trie* t) {
+bool _trie_is_empty(Trie* t) {
     for (int i = 0; i < UCHAR_MAX; i++) {
         if (t->children[i] != NULL) {
             return false;
@@ -70,7 +73,7 @@ bool trie_is_empty(Trie* t) {
     return true;
 }
 
-bool trie_delete_aux(Trie* t, const char* key, int depth) {
+bool _trie_delete_aux(Trie* t, const char* key, int depth, bool* result) {
     if (t == NULL) {
         return false;
     }
@@ -78,21 +81,50 @@ bool trie_delete_aux(Trie* t, const char* key, int depth) {
         if (t->is_terminal) {
             t->is_terminal = false;
             t->value = -1 ;
-            return trie_is_empty(t);
+            *result = true ;
+            return _trie_is_empty(t);
         }
         return false;
     }
     int index = key[depth] ;
-    if (trie_delete_aux(t->children[index], key, depth + 1)) {
+    if (_trie_delete_aux(t->children[index], key, depth + 1, result)) {
         free(t->children[index]);
         t->children[index] = NULL;
-        return (!t->is_terminal && trie_is_empty(t));
+        return (!t->is_terminal && _trie_is_empty(t));
     }
     return false;
 }
 
-bool trie_delete(Trie* t, const char* key) {
-    return trie_delete_aux(t, key, 0);
+bool _trie_delete(Trie* t, const char* key, bool* result) {
+    return _trie_delete_aux(t, key, 0, result);
+}
+
+void trie_insert(char key[], int value) {
+    if (_the_trie == NULL)
+        _the_trie = _trie_mk_trie() ;
+    _trie_insert(_the_trie, key, value) ;
+}
+
+bool trie_delete(char key[]) {
+    bool result ;
+    _trie_delete(_the_trie, key, &result) ;
+    return result ;
+}
+
+bool trie_find(char key[], int* value) {
+    return _trie_find(_the_trie, key, value) ;
+}
+
+bool trie_is_empty(void) {   
+    if (_the_trie)
+        return _trie_is_empty(_the_trie) ;
+    else 
+        return true ;
+}
+
+void trie_free(void) {
+    if (_the_trie)
+        _trie_free(_the_trie) ;
 }
 
 #ifdef  _THEFT
@@ -110,13 +142,13 @@ struct theft_type_info random_trie_info = {
 } ;
 
 enum theft_alloc_res allocate_trie(struct theft *t, void *data, void **result) {
-    Trie* trie = trie_mk_trie() ;
+    Trie* trie = _trie_mk_trie() ;
     assert(t) ;
     int height = theft_random_choice(t, KEY_SIZE_LIMIT) ;
     Trie* aux = trie ;
     for (int h = 0; h < height; h ++) {
         int child = theft_random_choice(t, UCHAR_MAX) ;
-        aux->children[child] = trie_mk_trie() ;
+        aux->children[child] = _trie_mk_trie() ;
         aux->children[child]->is_terminal = theft_random_choice(t, 1) ;
         aux->children[child]->value = theft_random_choice(t, VALUE_LIMIT) ;
         aux = aux->children[child] ;
@@ -145,10 +177,10 @@ enum theft_trial_res property_insert_delete_find(struct theft *t, void *test_inp
     }
     char* some_key = mk_random_key(t) ;
     int some_value = theft_random_choice(t, VALUE_LIMIT); 
-    trie_insert(trie, some_key, some_value) ;
-    trie_delete(trie, some_key) ;
+    _trie_insert(trie, some_key, some_value) ;
+    _trie_delete(trie, some_key) ;
     bool found = false ;
-    found = trie_find(trie, some_key) ;
+    found = _trie_find(trie, some_key) ;
     free(some_key) ;
     some_key = NULL ;
     return !found? THEFT_TRIAL_PASS : THEFT_TRIAL_FAIL ; 

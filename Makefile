@@ -7,9 +7,6 @@ trie.so: trie.o
 test: trie.c
 	gcc trie.c -o test_trie -g -gdwarf-4 -g3 -fPIC -D _THEFT -I /data/theft/inc/ -L /data/theft/build/ -ltheft  
 
-test2: trie.c
-	gcc trie.c -o test_trie
-
 clean:
 	rm trie.o
 	rm trie.so
